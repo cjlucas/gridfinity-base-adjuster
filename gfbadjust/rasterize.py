@@ -9,14 +9,16 @@ cell is exact.
 """
 
 from .constants import PLACEMENT_CELL_SIZE_MM
-from .geometry import point_in_polygon
+from .geometry import loop_bbox, main_loop, point_in_polygon
 
 
 def rasterize(loops, grid_origin, cell_size=None):
     cell_size = cell_size or PLACEMENT_CELL_SIZE_MM
-    xs = [p[0] for loop in loops for p in loop]
-    ys = [p[1] for loop in loops for p in loop]
-    max_x, max_y = max(xs), max(ys)
+    # Grid extent comes from the main outer loop only -- small internal
+    # features (holes, slots, dividers) shouldn't extend it. The actual
+    # occupancy test below still checks against every loop, so those
+    # features are correctly respected as gaps via the even-odd rule.
+    _, _, max_x, max_y = loop_bbox(main_loop(loops))
     ox, oy = grid_origin
 
     nx = max(1, round((max_x - ox) / cell_size))

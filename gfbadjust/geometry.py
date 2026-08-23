@@ -1,6 +1,27 @@
 """Small 2D/3D geometry helpers."""
 
 
+def loop_bbox(loop):
+    xs = [p[0] for p in loop]
+    ys = [p[1] for p in loop]
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def main_loop(loops):
+    """The loop enclosing the largest bbox area.
+
+    Used to identify the true outer footprint boundary among a slice's
+    loops -- small internal features (holes, slots, dividers) that also
+    show up in the same slice shouldn't be allowed to skew bbox-based
+    measurements like grid-origin/extent detection.
+    """
+    def bbox_area(loop):
+        min_x, min_y, max_x, max_y = loop_bbox(loop)
+        return (max_x - min_x) * (max_y - min_y)
+
+    return max(loops, key=bbox_area)
+
+
 def point_in_polygon(point, loops):
     """Even-odd point-in-polygon test against a set of closed 2D loops.
 
