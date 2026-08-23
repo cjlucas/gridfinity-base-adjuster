@@ -150,6 +150,7 @@ def main(argv=None):
         grid_origin=grid_origin,
         input_stl_path=args.input.resolve(),
         occupied_cells=occupied_cells,
+        xy_bbox=(min_x, min_y, max_x, max_y),
     )
 
     work_dir = Path(tempfile.mkdtemp(prefix="gfbadjust-"))
