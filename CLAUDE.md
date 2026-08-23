@@ -87,6 +87,20 @@ base height most real-world Gridfinity STLs use. 4.75mm was confirmed
 against two independent real-world files. `--base-height` remains
 user-overridable since generators do vary.
 
+**The cut's clipping box in `run_template.scad` must never be hardcoded
+around world origin.** It was originally a fixed `[-1000,1000]` box in
+X/Y; any model positioned outside that range (e.g. a part laid out far
+from origin on a build plate — one real file had X coordinates around
+1400) meant the clip silently intersected nothing, so `difference()`
+removed no material at all. The original base survived completely
+intact, fused underneath the newly added feet, producing the confusing
+symptom of the *old* 42mm feet still being visibly present in the
+output. The clip box is now sized from the input's own XY bbox (passed
+through via `data.scad`) plus a margin — always derive spatial extents
+from the actual model, never assume it's near any particular absolute
+coordinate. `tests/fixtures/make_fixtures.scad`'s `"offset"` fixture
+(positioned far from origin) is a regression test for exactly this.
+
 ## Scope / assumptions
 
 - Input footprint must be a whole number of full 42mm cells — no
