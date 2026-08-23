@@ -7,7 +7,15 @@ from pathlib import Path
 
 from . import gridfit, rasterize, scad_gen, stl_io
 from .constants import DEFAULT_INPUT_BASE_HEIGHT
+from .geometry import loop_bbox, main_loop
 from .slicing import plane_slice
+
+# A loop from the same slice as the main outer boundary is only suspicious
+# (suggests --base-height sliced into the hollow body, producing a large
+# nested interior loop) if it's not small relative to the main loop --
+# small internal features (holes, divider/slot gaps) are normal and not
+# a sign of anything wrong.
+SUSPICIOUS_LOOP_AREA_FRACTION = 0.2
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
@@ -97,13 +105,24 @@ def main(argv=None):
             "check --base-height/--footprint-height"
         )
     if len(loops) > 1:
-        print(
-            f"warning: footprint slice found {len(loops)} separate loops. "
-            "If this bin doesn't actually have a hole/multiple islands, "
-            "--base-height is probably too tall and you're slicing through "
-            "the hollow body instead of the solid base/floor -- try a smaller value.",
-            file=sys.stderr,
-        )
+        main = main_loop(loops)
+        main_bbox = loop_bbox(main)
+        main_area = (main_bbox[2] - main_bbox[0]) * (main_bbox[3] - main_bbox[1])
+        suspicious = [l for l in loops if l is not main]
+        big_suspicious = [
+            l for l in suspicious
+            if (lambda b: (b[2] - b[0]) * (b[3] - b[1]))(loop_bbox(l)) / main_area
+            >= SUSPICIOUS_LOOP_AREA_FRACTION
+        ]
+        if big_suspicious:
+            print(
+                f"warning: footprint slice found {len(big_suspicious)} large "
+                "secondary loop(s) alongside the main outline. If this bin "
+                "doesn't actually have a hole/multiple islands, --base-height "
+                "is probably too tall and you're slicing through the hollow "
+                "body instead of the solid base/floor -- try a smaller value.",
+                file=sys.stderr,
+            )
 
     if args.grid_origin:
         gx, gy = (float(v) for v in args.grid_origin.split(","))
