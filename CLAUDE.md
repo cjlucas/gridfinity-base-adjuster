@@ -64,14 +64,23 @@ in practice). `gridfit.compute_grid_origin` now derives the origin
 directly from the footprint's own bbox corner (with the known half-gap
 correction) — never from an external frame.
 
-**Loop-based measurements (grid origin, extent) must use the *main*
-loop, not all loops pooled together.** A footprint slice can pick up
-small internal features (holes, divider walls, slots) as extra small
-loops. Pooling every point across every loop into a single bbox lets
-those features skew origin/extent detection. Use
-`geometry.main_loop()` (largest-bbox-area loop) for measurements, and
-only fall back to testing against *all* loops for the actual
-point-in-polygon occupancy check (where holes need to be respected).
+**Loop-based measurements (grid origin, extent) must pool ALL loops,
+not just the single largest one.** An earlier version measured extent
+from only `geometry.main_loop()` (the largest-bbox-area loop), reasoning
+that small internal features (holes, divider walls, slots) shouldn't be
+able to skew the bbox. That's true, but it also silently assumed
+there's always exactly one loop representing the whole footprint — false
+for a bin built from several separate, similarly-sized physical blocks
+with gaps between them (e.g. independent per-cell compartments): no
+single loop there is "the" footprint, so picking the biggest one
+truncated detection down to a single cell, and most of the bin got no
+base at all. `gridfit.compute_grid_origin`/`rasterize.rasterize` now use
+`geometry.all_loops_bbox` (pool every point of every loop). This is safe
+for the original hole/divider case too: a hole is always strictly
+inside the outer boundary, so pooling can't let it corrupt the bbox —
+excluding it was never actually necessary. `geometry.main_loop()` still
+exists, used only as an informal "biggest single chunk" reference for
+the multi-loop sanity warning in `cli.py`, not for real measurements.
 
 **The multi-loop warning in `cli.py` only fires for *large* secondary
 loops** (≥20% of the main loop's area), not any extra loop — small
@@ -112,19 +121,78 @@ coordinate. `tests/fixtures/make_fixtures.scad`'s `"offset"` fixture
 ## Commands
 
 ```
-python3 -m unittest discover -s tests   # unit tests, no OpenSCAD needed
-./tests/test_end_to_end.sh              # builds fixtures + runs the CLI, needs openscad on PATH
+python3 -m unittest discover -s tests        # unit tests, no OpenSCAD needed
+./tests/test_end_to_end.sh                   # synthetic fixtures + real-world corpus, needs openscad on PATH
+python3 tests/check_output.py IN.stl OUT.stl --expected-feet N   # ad hoc invariant check on any pair
 python3 -m gfbadjust INPUT.stl -o OUTPUT.stl -v
 ```
 
-## Verifying geometry changes
+## Testing strategy
 
-If you touch anything in `templates/gridfinity_base.scad` or the profile
-constants, don't just eyeball a render — verify numerically. The
-pattern used throughout this project's history: slice the mesh at many
-Z heights (`slicing.plane_slice`), track the loop width at each height
-to reconstruct the actual (inset, height) curve, and compare it point-
-for-point against a known-good reference bin if one is available. A
-quick visual render (`openscad --camera=... -o preview.png`, viewed with
-the Read tool) is a good sanity check but has repeatedly missed subtle
-directional/magnitude bugs that numeric comparison caught immediately.
+**The actual failure pattern in this project's history: every real bug
+so far was found only when a new real-world STL was tried — never by
+the synthetic fixtures, which were all added *after* the fact.**
+Synthetic fixtures only encode variation axes someone already thought
+of; real files keep surfacing ones nobody did (a footprint positioned
+far from world origin, a bin built from disconnected per-cell blocks,
+etc.). The testing setup here is layered specifically around that
+pattern, not just "add more unit tests":
+
+1. **Unit tests** (`tests/test_*.py`, `python3 -m unittest discover -s
+   tests`) — fast, no OpenSCAD, test pure Python logic (slicing,
+   gridfit, rasterize) against small hand-built inputs. Good for
+   pinning down a specific function's behavior once you know what
+   matters; not designed to catch geometry-level integration issues.
+
+2. **Invariant checks** (`tests/invariants.py`, driven by
+   `tests/check_output.py`) — properties that must hold for *any* valid
+   input/output pair, not exact-match assertions about one specific
+   fixture's expected geometry: output isn't empty, no leftover
+   42mm-scale feet, output XY bbox matches input XY bbox, foot count
+   matches expectation. Each one exists because it's exactly the kind of
+   check that would have caught a specific real regression (see the
+   docstrings in `invariants.py` for which commit each one guards
+   against). When you fix a new bug, ask first whether it's actually a
+   *new class* of invariant (something no existing check would catch)
+   before reaching for another fixture — a new invariant generalizes to
+   files you haven't seen yet; a fixture only covers the one you have.
+
+3. **Synthetic fixtures** (`tests/fixtures/make_fixtures.scad`, run via
+   `tests/test_end_to_end.sh`) — deliberately span known-tricky axes,
+   each one added because a real file hit it: `rect`/`lshape` (basic
+   shapes), `offset` (positioned far from world origin), `islands`
+   (built from disconnected per-cell blocks). When adding a new one,
+   name it for the *property* it tests, not the file that found it, and
+   wire an expected foot count into `test_end_to_end.sh`'s
+   `run_and_check` calls.
+
+4. **Real-world regression corpus**
+   (`tests/fixtures/regression_corpus/`, run via
+   `tests/run_regression_corpus.py`, wired into
+   `test_end_to_end.sh`) — actual third-party files that broke the tool,
+   kept permanently (gitignored locally, tracked via a committed
+   `manifest.json` — see that directory's README for the policy and
+   licensing reasoning). **This is the layer that has actually caught
+   every bug so far, so it's the one that must never be skipped when
+   fixing a new one.**
+
+**The rule when fixing any bug found via a new file:** (a) add an
+invariant to `invariants.py` if the failure represents a new class of
+wrongness, (b) add or extend a synthetic fixture that reproduces the
+specific structural property that broke it (not just the literal file),
+(c) drop the actual file into the regression corpus with a manifest
+entry, (d) document the gotcha in this file's list above. Steps (a)-(c)
+are about *never regressing on this again, including on files you
+haven't seen*; step (d) is about a future agent not reintroducing the
+same wrong assumption from a different angle.
+
+**Verifying geometry changes specifically:** if you touch anything in
+`templates/gridfinity_base.scad` or the profile constants, don't just
+eyeball a render — verify numerically. Slice the mesh at many Z heights
+(`slicing.plane_slice`), track the loop width at each height to
+reconstruct the actual (inset, height) curve, and compare it
+point-for-point against a known-good reference bin if one is available.
+A quick visual render (`openscad --camera=... -o preview.png`, viewed
+with the Read tool) is a good sanity check but has repeatedly missed
+subtle directional/magnitude bugs that numeric comparison caught
+immediately.

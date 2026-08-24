@@ -80,5 +80,11 @@ python3 -m unittest discover -s tests
 ./tests/test_end_to_end.sh
 ```
 
-The end-to-end test builds two synthetic fixtures with OpenSCAD (a plain
-rectangular bin and an L-shaped bin) and runs the tool against both.
+The end-to-end test builds several synthetic fixtures with OpenSCAD
+(plain rectangular, L-shaped, positioned far from world origin, and
+built from disconnected per-cell blocks) and checks the tool's output
+against each with `tests/check_output.py` — a set of reusable
+correctness invariants (see `tests/invariants.py`) rather than exact
+geometry matches. It also runs a local real-world regression corpus if
+one is present (see `tests/fixtures/regression_corpus/README.md`) — see
+`CLAUDE.md` for the full testing strategy and why that corpus matters.

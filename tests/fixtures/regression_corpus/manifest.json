@@ -1,0 +1,9 @@
+[
+  {
+    "file": "field-notes-holder-v2.stl",
+    "expected_feet": 48,
+    "cli_args": [],
+    "regression_for": "multi-island footprint truncation (commit 7e867b4) -- a 3x4-cell bin built from 12 separate physical blocks with gaps between them, none of which alone represented the whole footprint",
+    "note": "footprint slices into 12 similarly-sized separate loops rather than one continuous outer boundary"
+  }
+]
