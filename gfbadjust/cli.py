@@ -116,11 +116,14 @@ def main(argv=None):
         ]
         if big_suspicious:
             print(
-                f"warning: footprint slice found {len(big_suspicious)} large "
-                "secondary loop(s) alongside the main outline. If this bin "
-                "doesn't actually have a hole/multiple islands, --base-height "
-                "is probably too tall and you're slicing through the hollow "
-                "body instead of the solid base/floor -- try a smaller value.",
+                f"note: footprint slice found {len(big_suspicious)} other large "
+                "loop(s) alongside the biggest one -- handled fine if this bin "
+                "is built from several separate blocks/islands (e.g. independent "
+                "per-cell compartments) or genuinely has a large hole. If that's "
+                "NOT the case and the footprint looks wrong (check with -v), "
+                "--base-height is probably too tall and you're slicing through "
+                "the hollow body instead of the solid base/floor -- try a "
+                "smaller value.",
                 file=sys.stderr,
             )
 

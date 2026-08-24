@@ -10,16 +10,32 @@ def loop_bbox(loop):
 def main_loop(loops):
     """The loop enclosing the largest bbox area.
 
-    Used to identify the true outer footprint boundary among a slice's
-    loops -- small internal features (holes, slots, dividers) that also
-    show up in the same slice shouldn't be allowed to skew bbox-based
-    measurements like grid-origin/extent detection.
+    Only meaningful as an informal "biggest single chunk" reference (e.g.
+    for the multi-loop sanity warning in cli.py) -- NOT a safe way to get
+    the true footprint's extent. A footprint can legitimately be made of
+    several separate, similarly-sized loops (e.g. a holder built from
+    independent per-cell blocks with gaps between them, none of which
+    alone represents the whole footprint) with no single "main" one.
     """
     def bbox_area(loop):
         min_x, min_y, max_x, max_y = loop_bbox(loop)
         return (max_x - min_x) * (max_y - min_y)
 
     return max(loops, key=bbox_area)
+
+
+def all_loops_bbox(loops):
+    """Bbox across every point of every loop, pooled together.
+
+    This is the correct way to measure a footprint's true extent: a hole
+    or internal divider loop is always strictly inside the outer
+    boundary so it can't corrupt the result, and a footprint made of
+    several separate islands (see main_loop's docstring) is only
+    measured correctly by including all of them.
+    """
+    xs = [p[0] for loop in loops for p in loop]
+    ys = [p[1] for loop in loops for p in loop]
+    return min(xs), min(ys), max(xs), max(ys)
 
 
 def point_in_polygon(point, loops):
