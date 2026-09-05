@@ -1,0 +1,26 @@
+[
+  {
+    "file": "gf-rebuilt-bin-1x1x6-s1x1-Standard-21fbb.stl",
+    "expected_lip_height": 3.5514717102050767,
+    "regression_for": "initial gfladjust implementation -- ground-truth reference confirming mod-7-unit-height detection on a real gridfinity-rebuilt-openscad bin",
+    "note": "1x1x6-s1x1 tall single-column bin with a scooped interior; inner cavity is NOT a reliable lip signal on this file (it varies with height even far from the lip) -- see gfladjust/lip_detect.py's module docstring"
+  },
+  {
+    "file": "gf-rebuilt-bin-1x1x6-s1x1-Standard-0bf37.stl",
+    "expect_no_lip": true,
+    "regression_for": "initial gfladjust implementation -- same bin family as the 21fbb entry above but without a lip (height is already a clean 7mm-unit multiple); must not be mistaken for one",
+    "note": "the reference file the 21fbb entry's expected output should geometrically match once its lip is removed"
+  },
+  {
+    "file": "Field+Notes+holder+v2.stl",
+    "expected_lip_height": 3.8,
+    "regression_for": "outer-only confirmation check false negative -- an outer-wall-only confirmation check rejected this file's real lip because its outer wall never moves at all; fixed by also checking the pooled inner-hole loops",
+    "note": "user-confirmed to have a real stacking lip. height is 31.8mm = 4*7mm + 3.8mm, but the outer wall stays flat to within 0.02mm of the top -- the lip only shows as a sharp jump in the inner bore (~123mm to ~102mm) exactly at z = max_z - 3.8"
+  },
+  {
+    "file": "Field+Notes+holder+v2_21mm.stl",
+    "expected_lip_height": 3.8,
+    "regression_for": "same bug/fix as the Field+Notes+holder+v2.stl entry above -- this is that file after gfbadjust's base replacement (21mm feet); same lip geometry, confirms the lip detector doesn't care about the base/foot shape below it",
+    "note": "same total height (31.8mm) and same inner-bore-only lip signature as the plain v2.stl entry"
+  }
+]

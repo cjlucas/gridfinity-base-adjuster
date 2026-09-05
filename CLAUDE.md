@@ -11,6 +11,17 @@ unscaled Gridfinity chamfer profile — not a scaled-down miniature, and
 not a trimmed quarter of a bigger foot. See `README.md` for user-facing
 usage.
 
+`gfladjust` is a second, separate tool in the same repo: it removes a
+Gridfinity item's *stacking lip* (the raised rim near the top of a
+bin's walls that lets another bin nest on top of it). It's intentionally
+a standalone package (own CLI entry point, own templates dir) sharing
+only the low-level, generator-agnostic modules (`stl_io`, `slicing`,
+`geometry`) with `gfbadjust` — not its grid/footprint-specific
+orchestration, which lip removal doesn't need at all. See
+`gfladjust/lip_detect.py`'s module docstring for the detection approach
+and why it works the way it does; short version further down in
+"Hard-won gotchas".
+
 ## Architecture: Python measures, OpenSCAD builds
 
 Python (`gfbadjust/*.py`, stdlib only, no dependencies) does analysis
@@ -110,6 +121,52 @@ from the actual model, never assume it's near any particular absolute
 coordinate. `tests/fixtures/make_fixtures.scad`'s `"offset"` fixture
 (positioned far from origin) is a regression test for exactly this.
 
+**`gfladjust`'s stacking-lip detection has no `--lip-height` flag —
+height is auto-detected, and getting this wrong matters.** The obvious
+approach (scan the outer wall's footprint from the top down looking for
+where it returns to a stable baseline width) turns out not to work: the
+real lip mechanism (reverse engineered from
+`kennetek/gridfinity-rebuilt-openscad`'s own source, almost certainly
+the generator behind the two `gf-rebuilt-bin-*` reference files in
+`tests/fixtures/lip_regression_corpus/`) is an *inner*-bore shelf, not
+an outer-wall flare — the outer footprint barely moves except right at
+the tip. Worse, a bin's inner cavity can legitimately vary with height
+for reasons that have nothing to do with a lip (the reference bins here
+are tall single-column bins with a scooped interior), which makes "does
+the inner cross-section return to a baseline" unreliable too. What
+actually works, used instead: Gridfinity heights are built from a fixed
+7mm unit (already noted below re: `--base-height`'s 7mm-vs-4.75mm mixup)
+and a lip is purely *additive* height on top of a whole-unit body, so
+`(total mesh height) mod 7mm` gives a strong, cheap, generator-agnostic
+candidate lip height with no cross-sectional analysis needed as the
+*primary* signal — confirmed against a real lipped/lip-less pair to 5
+decimal places. A lightweight geometric check near the tip (vs. just
+below the candidate cut) then confirms a real transition exists there,
+rather than the height simply happening to land on a unit multiple by
+coincidence — see `tests/fixtures/make_lip_fixtures.scad`'s
+`"coincidental"` fixture, a regression test for exactly that failure
+mode.
+
+**That confirmation check must look at the inner bore, not just the
+outer wall.** The first version only compared outer-wall width near the
+tip vs. below the cut (true for the `gf-rebuilt-bin-*` pair, whose lip
+does show a small outer dip from its tip fillet). A real
+"Field Notes holder" file (`tests/fixtures/lip_regression_corpus/`)
+broke that: its outer wall never moves at all (flat to within 0.02mm of
+the top), and its real lip only shows as a sharp jump in the inner bore
+(~123mm to ~102mm within 0.01mm of Z) exactly at the mod-7 candidate cut
+height — an outer-only check flagged this real lip as "coincidental"
+and refused to remove it. Fixed by checking both the outer wall AND the
+pooled inner-hole loops (via `geometry.all_loops_bbox`, same
+all-loops-not-just-the-biggest lesson as the multi-loop gotcha above,
+applied here to a lip that could span several compartment openings) and
+confirming on either signal — see
+`tests/fixtures/make_lip_fixtures.scad`'s `"inner_lip"` fixture and
+`tests/test_lip_detect.py`'s `test_detects_inner_only_lip`, both
+regression tests for exactly this. Full reasoning lives in
+`gfladjust/lip_detect.py`'s module docstring — read it before touching
+the detection logic.
+
 ## Scope / assumptions
 
 - Input footprint must be a whole number of full 42mm cells — no
@@ -121,10 +178,13 @@ coordinate. `tests/fixtures/make_fixtures.scad`'s `"offset"` fixture
 ## Commands
 
 ```
-python3 -m unittest discover -s tests        # unit tests, no OpenSCAD needed
-./tests/test_end_to_end.sh                   # synthetic fixtures + real-world corpus, needs openscad on PATH
-python3 tests/check_output.py IN.stl OUT.stl --expected-feet N   # ad hoc invariant check on any pair
+python3 -m unittest discover -s tests        # unit tests, no OpenSCAD needed (covers both tools)
+./tests/test_end_to_end.sh                   # gfbadjust: synthetic fixtures + real-world corpus, needs openscad on PATH
+./tests/test_lip_end_to_end.sh               # gfladjust: synthetic fixtures + real-world corpus, needs openscad on PATH
+python3 tests/check_output.py IN.stl OUT.stl --expected-feet N          # ad hoc gfbadjust invariant check on any pair
+python3 tests/check_lip_output.py IN.stl OUT.stl --expected-lip-height N   # ad hoc gfladjust invariant check on any pair
 python3 -m gfbadjust INPUT.stl -o OUTPUT.stl -v
+python3 -m gfladjust INPUT.stl -o OUTPUT.stl -v
 ```
 
 ## Testing strategy
@@ -185,6 +245,14 @@ entry, (d) document the gotcha in this file's list above. Steps (a)-(c)
 are about *never regressing on this again, including on files you
 haven't seen*; step (d) is about a future agent not reintroducing the
 same wrong assumption from a different angle.
+
+`gfladjust` has its own parallel set of these four layers —
+`tests/test_lip_detect.py`, `tests/lip_invariants.py`,
+`tests/fixtures/make_lip_fixtures.scad`,
+`tests/fixtures/lip_regression_corpus/` — all following the same rule
+above. Keep them separate from `gfbadjust`'s (don't merge the corpora or
+invariants files): the two tools test unrelated geometry and share no
+fixtures.
 
 **Verifying geometry changes specifically:** if you touch anything in
 `templates/gridfinity_base.scad` or the profile constants, don't just

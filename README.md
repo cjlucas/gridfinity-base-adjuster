@@ -1,5 +1,12 @@
 # gridfinity-base-adjuster
 
+Two small command-line tools for adjusting a Gridfinity bin/holder STL:
+`gfbadjust` replaces its base, and `gfladjust` removes its stacking lip.
+Both are stdlib-only Python that hand off the actual cut/rebuild to
+OpenSCAD.
+
+## gfbadjust: replacing the base
+
 Takes an STL of a Gridfinity bin (or any Gridfinity-based item with a
 standard, whole-cell footprint) and replaces its base with one built from
 independent 21mm feet instead of standard 42mm feet — four feet per
@@ -16,13 +23,13 @@ The foot geometry and profile dimensions were reverse-engineered and
 numerically verified against real reference bins (matched point-for-point
 against a "gf-rebuilt" style Standard bin's actual mesh).
 
-## Requirements
+### Requirements
 
 - Python 3 (stdlib only — no dependencies to install)
 - [OpenSCAD](https://openscad.org/) available on `PATH` (or pass
   `--openscad-bin`)
 
-## Usage
+### Usage
 
 ```
 python3 -m gfbadjust INPUT.stl -o OUTPUT.stl [options]
@@ -46,7 +53,7 @@ Example:
 python3 -m gfbadjust my-2x2-bin.stl -o my-2x2-bin-21mm.stl -v
 ```
 
-## How it works
+### How it works
 
 1. Parse the input STL (a small hand-rolled binary/ASCII reader — no
    external mesh library needed).
@@ -66,25 +73,79 @@ All of the actual solid modeling (the cut and the final union) is done by
 OpenSCAD's CGAL-backed boolean engine — the Python side only measures the
 input and writes out the parameters OpenSCAD needs.
 
-## Assumptions / limitations
+### Assumptions / limitations
 
 - The input's footprint must be a whole number of full 42mm Gridfinity
   cells (no partial-cell/irregular footprints in this version).
 - The input mesh should be in millimeters and reasonably watertight.
 - No magnet/screw holes are generated in the new base.
 
+## gfladjust: removing the stacking lip
+
+Takes an STL of a Gridfinity bin that has a stacking lip (the raised rim
+near the top of the walls that lets another bin nest on top of it) and
+removes it, leaving a flush top edge.
+
+The lip's height is **auto-detected**, not user-supplied — different
+generators use slightly different lip heights/shapes, so a hardcoded
+default risked silently cutting the wrong amount. Detection uses
+Gridfinity's fixed 7mm height unit: a bin's base + walls always sum to a
+whole multiple of it, and a lip is purely extra height added on top of
+that, so `(total height) mod 7mm` gives a reliable candidate lip height,
+confirmed by a quick check that the wall's outer profile actually
+changes near the top. If a file's height doesn't look like a real lip,
+the tool refuses to guess rather than risk cutting into legitimate
+geometry. See `gfladjust/lip_detect.py` for the full reasoning.
+
+### Requirements
+
+Same as `gfbadjust` above (Python 3 stdlib-only, OpenSCAD on `PATH`).
+
+### Usage
+
+```
+python3 -m gfladjust INPUT.stl -o OUTPUT.stl [options]
+```
+
+Options:
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--openscad-bin PATH` | search `PATH` | Path to the `openscad` binary. |
+| `--keep-intermediate` | off | Keep the generated `.scad`/data files instead of deleting the temp dir. |
+| `--dry-run` | off | Run detection and emit the generated `.scad` files only, skip invoking OpenSCAD. |
+| `-v`, `--verbose` | off | Print the detected bbox and lip height. |
+
+Example:
+
+```
+python3 -m gfladjust my-lipped-bin.stl -o my-lipped-bin-nolip.stl -v
+```
+
+If the input has no lip (its height is already a clean multiple of the
+7mm unit), or the tool can't confidently confirm a real lip is present,
+it exits with an error instead of modifying the file.
+
+### Assumptions / limitations
+
+- The input mesh should be in millimeters and reasonably watertight.
+- Only removes a lip that runs around the entire top edge; a
+  label-tab-style lip on one side only isn't detected (out of scope for
+  now).
+- No `--lip-height` override by design — see above.
+
 ## Testing
 
 ```
-python3 -m unittest discover -s tests
-./tests/test_end_to_end.sh
+python3 -m unittest discover -s tests   # covers both tools
+./tests/test_end_to_end.sh              # gfbadjust
+./tests/test_lip_end_to_end.sh          # gfladjust
 ```
 
-The end-to-end test builds several synthetic fixtures with OpenSCAD
-(plain rectangular, L-shaped, positioned far from world origin, and
-built from disconnected per-cell blocks) and checks the tool's output
-against each with `tests/check_output.py` — a set of reusable
-correctness invariants (see `tests/invariants.py`) rather than exact
-geometry matches. It also runs a local real-world regression corpus if
-one is present (see `tests/fixtures/regression_corpus/README.md`) — see
-`CLAUDE.md` for the full testing strategy and why that corpus matters.
+Each tool's end-to-end test builds synthetic fixtures with OpenSCAD and
+checks the tool's output against reusable correctness invariants
+(`tests/invariants.py` / `tests/lip_invariants.py`) rather than exact
+geometry matches, then runs a local real-world regression corpus if one
+is present (`tests/fixtures/regression_corpus/` /
+`tests/fixtures/lip_regression_corpus/`) — see `CLAUDE.md` for the full
+testing strategy and why that corpus matters.
