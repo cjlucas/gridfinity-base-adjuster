@@ -134,6 +134,38 @@ it exits with an error instead of modifying the file.
   now).
 - No `--lip-height` override by design — see above.
 
+## macOS Finder integration (Quick Actions)
+
+On macOS, both tools are also available as Finder **Quick Actions** so
+you can run them by right-clicking an STL without opening a terminal.
+
+Install once:
+
+```
+./macos/install.sh
+```
+
+Then right-click one or more `.stl` files in Finder and choose:
+
+- **Gridfinity: Adjust Base (21mm)** — runs `gfbadjust` with defaults,
+  writes `<name>_21mm.stl` next to the input.
+- **Gridfinity: Remove Stacking Lip** — runs `gfladjust` with defaults
+  (auto-detected lip height), writes `<name>_nolip.stl` next to the
+  input.
+
+Both always run with the tools' default settings — use the CLI directly
+if you need to override something like `--base-height`. A result is
+overwritten if you run the same Quick Action again on the same file.
+
+Success/failure is reported via a macOS notification. On failure, the
+notification shows the error and the full log is kept under
+`~/Library/Logs/GridfinityAdjuster/`. Non-STL files and folders in a
+multi-selection are skipped rather than failing the whole batch.
+
+If you move the repo to a different path, just re-run `./macos/install.sh`
+to reinstall with the new path. To remove the Quick Actions, run
+`./macos/uninstall.sh`.
+
 ## Testing
 
 ```

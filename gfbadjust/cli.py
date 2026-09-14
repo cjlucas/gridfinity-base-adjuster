@@ -70,7 +70,11 @@ def find_openscad(explicit):
     found = shutil.which("openscad")
     if found:
         return found
-    for candidate in ("/opt/homebrew/bin/openscad", "/usr/local/bin/openscad"):
+    for candidate in (
+        "/opt/homebrew/bin/openscad",
+        "/usr/local/bin/openscad",
+        "/Applications/OpenSCAD.app/Contents/MacOS/OpenSCAD",
+    ):
         if Path(candidate).exists():
             return candidate
     raise SystemExit("error: could not find an 'openscad' binary; pass --openscad-bin")
