@@ -5,5 +5,12 @@
     "cli_args": [],
     "regression_for": "multi-island footprint truncation (commit 7e867b4) -- a 3x4-cell bin built from 12 separate physical blocks with gaps between them, none of which alone represented the whole footprint",
     "note": "footprint slices into 12 similarly-sized separate loops rather than one continuous outer boundary"
+  },
+  {
+    "file": "narrow-trays-with-labels.stl",
+    "expected_feet": 4,
+    "cli_args": [],
+    "regression_for": "centroid occupancy sample landing exactly inside a local void at cell center, canceling out via the even-odd rule to falsely register as unoccupied (fixed alongside the centerholes synthetic fixture)",
+    "note": "a single 42mm cell with a plain solid base (no holes) but a scalloped, egg-crate-shaped body floor above it -- a rounded trough's low point landed almost exactly on a placement cell's centroid, so the old single-centroid-sample rasterize() detected 0/4 occupied cells"
   }
 ]

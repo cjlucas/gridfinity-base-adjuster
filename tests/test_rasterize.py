@@ -34,6 +34,28 @@ class TestRasterize(unittest.TestCase):
         self.assertEqual((nx, ny), (2, 2))
         self.assertEqual(set(occupied), {(0, 0), (1, 0), (0, 1), (1, 1)})
 
+    def test_hole_at_cell_center_still_occupied(self):
+        # A small local void (e.g. a magnet/screw hole) bored right
+        # through the centroid of an otherwise fully solid cell must not
+        # make the cell register as empty -- the centroid sample lands
+        # inside two loops (the outer footprint and the hole), which the
+        # even-odd rule cancels out to "outside". A drilled hole here is
+        # a minimal generic stand-in for this failure mode; the real
+        # regression that found it was a "Narrow Trays with Labels" file
+        # whose base is a plain solid single cell (no holes at all) but
+        # whose body has a scalloped, egg-crate-shaped floor -- the low
+        # point of a rounded trough landed almost exactly on a placement
+        # cell's centroid, which made every cell in the bin register as
+        # unoccupied even though each was fully supported underneath.
+        outer = [(0.0, 0.0), (42.0, 0.0), (42.0, 42.0), (0.0, 42.0)]
+        # Tiny hole dead center of the (0,0)-(21,21) sub-cell.
+        hole = [
+            (9.0, 9.0), (12.0, 9.0), (12.0, 12.0), (9.0, 12.0),
+        ]
+        occupied, nx, ny = rasterize([outer, hole], (0.0, 0.0))
+        self.assertEqual((nx, ny), (2, 2))
+        self.assertEqual(set(occupied), {(0, 0), (1, 0), (0, 1), (1, 1)})
+
     def test_multi_island_footprint_covers_full_extent(self):
         # Three separate, similarly-sized loops (independent per-cell
         # blocks, not one continuous body) tiling a 2x2 area. The full

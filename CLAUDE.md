@@ -100,6 +100,28 @@ sign of a bad `--base-height`. A real bad-height symptom looks like a
 large nested loop close in size to the main outline (sliced into the
 hollow interior), not tiny internal features.
 
+**`rasterize.rasterize` must not decide occupancy from a single centroid
+sample.** The footprint is sliced 0.2mm above the cut plane to read the
+shape of the body resting on the base, but a real body's floor right
+there isn't always flat. A real "Narrow Trays with Labels" file has a
+perfectly solid, hole-free single-cell base — confirmed by rendering it
+— but the body above it has a scalloped, egg-crate-style floor (four
+rounded troughs meeting at points), and the low point of a trough
+happened to land almost exactly on a placement cell's centroid. The
+slice is genuinely void there even though the cell is fully supported
+by solid base underneath, so the centroid sample read "not inside" for
+every cell and the tool refused to run at all ("no occupied cells
+detected"). (A small magnet/screw hole bored through a cell center
+would trip the same even-odd-rule cancellation, though that wasn't the
+actual cause here.) Fixed by sampling 5 points per cell (centroid plus
+4 points offset by 1/4 of the cell size) and going with the majority —
+see `tests/fixtures/make_fixtures.scad`'s `"centerholes"` fixture
+(a drilled hole, used as a minimal generic proxy for "a small local
+void at the sample point" rather than a literal model of the scalloped
+floor) and
+`tests/test_rasterize.py::test_hole_at_cell_center_still_occupied`,
+both regression tests for exactly this class of failure.
+
 **`--base-height` default is 4.75mm, not the reference implementation's
 7mm.** An earlier iteration conflated an OpenSCAD reference project's
 own "profile + bridge = one Z-unit" convention (7mm) with the actual

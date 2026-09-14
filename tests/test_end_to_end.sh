@@ -12,6 +12,7 @@ echo "== building fixtures =="
 "$OPENSCAD" -D 'fixture="lshape"' -o "$WORK_DIR/lshape_bin.stl" tests/fixtures/make_fixtures.scad
 "$OPENSCAD" -D 'fixture="offset"' -o "$WORK_DIR/offset_bin.stl" tests/fixtures/make_fixtures.scad
 "$OPENSCAD" -D 'fixture="islands"' -o "$WORK_DIR/islands_bin.stl" tests/fixtures/make_fixtures.scad
+"$OPENSCAD" -D 'fixture="centerholes"' -o "$WORK_DIR/centerholes_bin.stl" tests/fixtures/make_fixtures.scad
 
 run_and_check() {
     local name="$1" expected_feet="$2"
@@ -24,6 +25,7 @@ run_and_check simple_bin 24
 run_and_check lshape_bin 12
 run_and_check offset_bin 24
 run_and_check islands_bin 24
+run_and_check centerholes_bin 24
 
 echo "== running the real-world regression corpus (if any files are present) =="
 python3 tests/run_regression_corpus.py

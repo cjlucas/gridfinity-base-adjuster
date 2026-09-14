@@ -6,6 +6,7 @@
 //   openscad -D 'fixture="lshape"'    -o lshape_bin.stl make_fixtures.scad
 //   openscad -D 'fixture="offset"'    -o offset_bin.stl make_fixtures.scad
 //   openscad -D 'fixture="islands"'   -o islands_bin.stl make_fixtures.scad
+//   openscad -D 'fixture="centerholes"' -o centerholes_bin.stl make_fixtures.scad
 
 include <../../gfbadjust/templates/gridfinity_base.scad>
 
@@ -58,12 +59,44 @@ module fixture_bin_islands(cells, origin = [0, 0]) {
     }
 }
 
+// Same layout as "rect", but with a small hole bored straight through
+// the center of every 21mm placement sub-cell. This is a minimal,
+// generic stand-in for "some small local void lands exactly on the
+// occupancy sample point" -- a drilled hole is the easiest way to
+// construct that in OpenSCAD, though the real file that found this bug
+// (a "Narrow Trays with Labels" bin) had no holes at all: its base is a
+// plain solid single cell, but its body has a scalloped, egg-crate
+// floor whose rounded trough bottoms happened to dip to their lowest
+// point almost exactly at a placement cell's centroid. Either way, the
+// occupancy test's single centroid sample landed exactly inside a
+// local void -- the even-odd rule then saw the sample as "inside two
+// loops" (solid footprint + hole), canceling out to "not occupied", so
+// a fully solid bin was silently detected as having zero occupied
+// cells.
+CENTER_HOLE_RADIUS = 1.5;
+
+module fixture_bin_centerholes(cells, origin = [0, 0]) {
+    difference() {
+        fixture_bin(cells, origin);
+        for (c = cells)
+            for (sub = [[10.5, 10.5], [31.5, 10.5], [10.5, 31.5], [31.5, 31.5]])
+                translate([
+                    origin[0] + c[0] * 42 + sub[0],
+                    origin[1] + c[1] * 42 + sub[1],
+                    -1
+                ])
+                    cylinder(r = CENTER_HOLE_RADIUS, h = BASE_HEIGHT + WALL_HEIGHT + 2);
+    }
+}
+
 if (fixture == "lshape") {
     fixture_bin(LSHAPE_CELLS);
 } else if (fixture == "offset") {
     fixture_bin(RECT_CELLS, OFFSET_ORIGIN);
 } else if (fixture == "islands") {
     fixture_bin_islands(RECT_CELLS);
+} else if (fixture == "centerholes") {
+    fixture_bin_centerholes(RECT_CELLS);
 } else {
     fixture_bin(RECT_CELLS);
 }
